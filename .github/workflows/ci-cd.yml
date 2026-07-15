@@ -1,0 +1,66 @@
+name: CI/CD Pipeline
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+
+  # ---- STAGE 1: fast checks, runs on every PR and push ----
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Lint with Ruff
+        run: ruff check .
+
+      - name: Run unit tests
+        run: pytest -v
+
+  # ---- STAGE 2: build the Docker image, only after checks pass ----
+  build-image:
+    needs: lint-and-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Get short commit SHA
+        id: vars
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+
+      - name: Build Docker image
+        run: docker build -t my-ci-cd-app:${{ steps.vars.outputs.sha_short }} .
+
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "my-ci-cd-app:${{ steps.vars.outputs.sha_short }}"
+          severity: "CRITICAL,HIGH"
+          exit-code: "0"   # set to "1" to actually fail the pipeline on findings
+          format: "table"
+
+  # ---- STAGE 3: manual approval gate before "deployment" ----
+  deploy:
+    needs: build-image
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    environment: production   # <-- THIS creates the manual approval gate in GitHub
+    steps:
+      - name: Simulate deployment
+        run: |
+          echo "Deploying commit ${{ github.sha }} to production..."
+          echo "(In a real pipeline, this step would run helm upgrade or terraform apply)"
+          echo "Deployment complete."

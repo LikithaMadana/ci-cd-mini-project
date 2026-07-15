@@ -1,0 +1,10 @@
+from app import add
+
+
+def test_add_deliberately_wrong():
+    """Uncomment this test (and remove test_add from test_app.py, or just
+    add this function into test_app.py) to see the pipeline correctly FAIL
+    at the pytest stage. This is useful to watch once too — seeing a
+    pipeline fail and knowing exactly why is as valuable as seeing it pass.
+    """
+    assert add(2, 2) == 5  # deliberately wrong, will fail
